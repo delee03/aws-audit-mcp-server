@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "aws-documentation-server": {
+            "command": "python",
+            "args": ["src/server.py"],
+            "env": {
+                "FASTMCP_LOG_LEVEL": "INFO"
+            },
+            "disabled": false,
+            "autoApprove": []
+        }
+    }
+}
