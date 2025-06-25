@@ -362,9 +362,36 @@ async def recommend(
     return results
 
 
+def get_sse_app():
+    """Get SSE FastAPI app for SSE transport."""
+    return mcp.sse_app()
+
+def get_streamable_app():
+    """Get Streamable HTTP FastAPI app."""
+    return mcp.app()
+
+def main_stdio():
+    """Run the MCP server with stdio transport."""
+    logger.info('Starting AWS Documentation MCP Server (stdio)')
+    mcp.run(transport='stdio')
+
+def main_sse(port: int = 8001):
+    """Run the MCP server with SSE transport."""
+    logger.info(f'Starting AWS Documentation MCP Server (SSE) on port {port}')
+    # Note: Official Python MCP SDK doesn't support custom ports easily
+    # This will run on default port 8000
+    mcp.run(transport='sse')
+
+def main_streamable(port: int = 8000):
+    """Run the MCP server with Streamable HTTP transport."""
+    logger.info(f'Starting AWS Documentation MCP Server (Streamable HTTP) on port {port}')
+    # Note: Official Python MCP SDK doesn't support custom ports easily
+    # This will run on default port 8000
+    mcp.run(transport='streamable-http')
+
 def main():
     """Run the MCP server with CLI argument support."""
-    logger.info('Starting AWS Documentation MCP Server')
+    logger.info('Starting AWS Documentation MCP Server (stdio - default)')
     mcp.run()
 
 

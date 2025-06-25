@@ -26,5 +26,14 @@ COPY src/ ${LAMBDA_TASK_ROOT}/src/
 # Copy the lambda handler
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}
 
+# Create info about available endpoints
+RUN echo "AWS Documentation MCP Server - Multiple Endpoints" > ${LAMBDA_TASK_ROOT}/endpoints.txt && \
+    echo "Available endpoints:" >> ${LAMBDA_TASK_ROOT}/endpoints.txt && \
+    echo "  / - Root service info" >> ${LAMBDA_TASK_ROOT}/endpoints.txt && \
+    echo "  /fetch?url=<aws_docs_url> - Direct documentation fetch" >> ${LAMBDA_TASK_ROOT}/endpoints.txt && \
+    echo "  /mcp/ - MCP Streamable HTTP transport" >> ${LAMBDA_TASK_ROOT}/endpoints.txt && \
+    echo "  /sse/ - MCP SSE transport" >> ${LAMBDA_TASK_ROOT}/endpoints.txt && \
+    echo "  Direct invocation - Send JSON-RPC MCP requests" >> ${LAMBDA_TASK_ROOT}/endpoints.txt
+
 # Set the CMD to your handler
 CMD [ "lambda_handler.lambda_handler" ]
