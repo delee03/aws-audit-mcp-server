@@ -9,7 +9,6 @@ from loguru import logger
 logger.remove()
 logger.add(sys.stderr, level=os.getenv('FASTMCP_LOG_LEVEL', 'WARNING'))
 
-
 def main():
     """Run the MCP server with CLI argument support."""
     from server_aws import main as aws_main

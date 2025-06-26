@@ -1,24 +1,10 @@
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""awslabs AWS Documentation MCP Server implementation."""
+""" AWS Documentation MCP Server implementation."""
 
 import httpx
 import json
 import re
 import uuid
 
-# Import models
 from models import (
     RecommendationResult,
     SearchResult,
@@ -27,15 +13,15 @@ from server_utils import (
     DEFAULT_USER_AGENT,
     read_documentation_impl,
 )
-
-# Import utility functions
-from util import (
+from utils import (
     parse_recommendation_results,
 )
+
 from loguru import logger
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 from typing import List
+from mcp.server.sse import SseServerTransport
 
 
 SEARCH_API_URL = 'https://proxy.search.docs.aws.amazon.com/search'
@@ -375,18 +361,18 @@ def main_stdio():
     logger.info('Starting AWS Documentation MCP Server (stdio)')
     mcp.run(transport='stdio')
 
-def main_sse(port: int = 8001):
+def main_sse(port: int = 8000):
     """Run the MCP server with SSE transport."""
     logger.info(f'Starting AWS Documentation MCP Server (SSE) on port {port}')
-    # Note: Official Python MCP SDK doesn't support custom ports easily
-    # This will run on default port 8000
+    # When running in Lambda, port doesn't matter as it uses the Lambda URL
+    # For local development, we use the specified port
     mcp.run(transport='sse')
 
 def main_streamable(port: int = 8000):
     """Run the MCP server with Streamable HTTP transport."""
     logger.info(f'Starting AWS Documentation MCP Server (Streamable HTTP) on port {port}')
-    # Note: Official Python MCP SDK doesn't support custom ports easily
-    # This will run on default port 8000
+    # When running in Lambda, port doesn't matter as it uses the Lambda URL
+    # For local development, we use the specified port
     mcp.run(transport='streamable-http')
 
 def main():
