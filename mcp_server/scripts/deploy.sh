@@ -5,9 +5,9 @@ set -e
 echo "Starting deployment process..."
 
 echo "Building Lambda package..."
-./build.sh
+./scripts/build.sh
 
-if [ ! -f "aws-audit-mcp-server.zip" ]; then
+if [ ! -f "terraform/aws-audit-mcp-server.zip" ]; then
     echo "❌ Build failed! Package not created."
     exit 1
 fi
@@ -15,8 +15,14 @@ fi
 echo "Deploying with Terraform..."
 cd terraform
 
+# Clean up old plan files
+rm -f tfplan
+
 if [ ! -d ".terraform" ]; then
     echo "Init Terraform..."
+    terraform init
+else
+    echo "Re-initializing Terraform (in case of provider changes)..."
     terraform init
 fi
 
@@ -31,7 +37,11 @@ FUNCTION_URL=$(terraform output -raw mcp_server_function_url)
 
 echo "Deployment complete!"
 echo "MCP Server Function URL: $FUNCTION_URL"
-echo "Example configuration:"
+echo ""
+echo "🔗 Use this URL in your MCP clients:"
+echo "   ${FUNCTION_URL}sse"
+echo ""
+echo "📋 Example configuration for GitHub Copilot:"
 echo '{
   "mcpServers": {
     "aws-docs": {
@@ -39,4 +49,7 @@ echo '{
     }
   }
 }'
+echo ""
+echo "📋 Example configuration for n8n MCP Tool:"
+echo "   URL: ${FUNCTION_URL}sse"
 

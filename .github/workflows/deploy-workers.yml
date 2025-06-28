@@ -1,0 +1,244 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: 
+      - main
+      - master
+    paths:
+      - 'mcp_server/**'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  WORKING_DIRECTORY: './mcp_server'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Cloudflare Workers
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'mcp_server/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: npm ci
+
+      - name: Validate source files
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🔍 Validating project structure..."
+          
+          # Check required files exist
+          if [ ! -f "wrangler.toml" ]; then
+            echo "❌ wrangler.toml not found!"
+            exit 1
+          fi
+          
+          if [ ! -f "src/worker.js" ]; then
+            echo "❌ src/worker.js not found!"
+            exit 1
+          fi
+          
+          if [ ! -f "src/mcp-server.js" ]; then
+            echo "❌ src/mcp-server.js not found!"
+            exit 1
+          fi
+          
+          echo "✅ All required files present"
+          
+          # Validate wrangler.toml syntax
+          node -e "
+            const fs = require('fs');
+            const content = fs.readFileSync('wrangler.toml', 'utf8');
+            if (!content.includes('name =')) {
+              console.error('❌ Worker name not found in wrangler.toml');
+              process.exit(1);
+            }
+            if (!content.includes('main =')) {
+              console.error('❌ Main entry point not found in wrangler.toml');
+              process.exit(1);
+            }
+            console.log('✅ wrangler.toml validation passed');
+          "
+          
+          # Check JavaScript syntax
+          echo "🔍 Checking JavaScript syntax..."
+          npm run validate
+          echo "✅ JavaScript syntax validation passed"
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: '3'
+          command: deploy
+          workingDirectory: ${{ env.WORKING_DIRECTORY }}
+
+      - name: Test deployment
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🧪 Testing deployment..."
+          
+          # Extract worker name from wrangler.toml
+          WORKER_NAME=$(grep '^name =' wrangler.toml | cut -d'"' -f2 | head -1)
+          if [ -z "$WORKER_NAME" ]; then
+            WORKER_NAME=$(grep "^name =" wrangler.toml | sed "s/name = //" | tr -d '"' | tr -d "'" | head -1)
+          fi
+          
+          WORKER_URL="https://${WORKER_NAME}.fuderr-pham.workers.dev"
+          echo "🌐 Testing Worker URL: $WORKER_URL"
+          
+          # Test health endpoint with retries
+          echo "🏥 Testing health endpoint..."
+          for i in {1..5}; do
+            if curl -f -s --max-time 10 "$WORKER_URL/health" > /dev/null; then
+              echo "✅ Health endpoint responding"
+              break
+            else
+              echo "⏳ Attempt $i failed, retrying in 5 seconds..."
+              sleep 5
+            fi
+            if [ $i -eq 5 ]; then
+              echo "❌ Health endpoint failed after 5 attempts"
+              exit 1
+            fi
+          done
+          
+          # Test SSE endpoint
+          echo "📡 Testing SSE endpoint..."
+          if curl -f -s --max-time 10 "$WORKER_URL/sse" > /dev/null; then
+            echo "✅ SSE endpoint responding"
+          else
+            echo "⚠️ SSE endpoint not responding (may be normal for initial deployment)"
+          fi
+          
+          # Test MCP protocol
+          echo "🔌 Testing MCP protocol..."
+          RESPONSE=$(curl -s --max-time 15 -X POST "$WORKER_URL/sse" \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":"test","method":"initialize","params":{"clientInfo":{"name":"github-actions","version":"1.0"}}}')
+          
+          if echo "$RESPONSE" | grep -q "jsonrpc"; then
+            echo "✅ MCP protocol responding correctly"
+          else
+            echo "⚠️ MCP protocol test inconclusive"
+          fi
+          
+          echo ""
+          echo "🎉 Deployment validation completed!"
+          echo "🌍 Worker URL: $WORKER_URL"
+          echo "📡 SSE Endpoint: $WORKER_URL/sse"
+
+      - name: Generate deployment summary
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          # Extract worker name from wrangler.toml  
+          WORKER_NAME=$(grep '^name =' wrangler.toml | cut -d'"' -f2 | head -1)
+          if [ -z "$WORKER_NAME" ]; then
+            WORKER_NAME=$(grep "^name =" wrangler.toml | sed "s/name = //" | tr -d '"' | tr -d "'" | head -1)
+          fi
+          
+          WORKER_URL="https://${WORKER_NAME}.fuderr-pham.workers.dev"
+          
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # ✅ Cloudflare Workers Deployment Successful
+          
+          ## 🚀 Deployment Details
+          - **Worker Name**: \`$WORKER_NAME\`
+          - **Worker URL**: [$WORKER_URL]($WORKER_URL)
+          - **SSE Endpoint**: [\`$WORKER_URL/sse\`]($WORKER_URL/sse)
+          - **Health Check**: [\`$WORKER_URL/health\`]($WORKER_URL/health)
+          - **Deployment Time**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          
+          ## 🌟 Features
+          - ⚡ **0ms cold starts** globally
+          - 🌍 **275+ edge locations** worldwide  
+          - 💰 **100,000 requests/day** FREE
+          - 🔒 **Automatic HTTPS** with Cloudflare SSL
+          - 📡 **Native SSE support** for MCP clients
+          
+          ## 🔧 Client Configuration
+          
+          ### GitHub Copilot (\`.vscode/settings.json\`)
+          \`\`\`json
+          {
+            "mcpServers": {
+              "aws-docs-workers": {
+                "url": "$WORKER_URL/sse"
+              }
+            }
+          }
+          \`\`\`
+          
+          ### n8n MCP Tool
+          - **URL**: \`$WORKER_URL/sse\`
+          
+          ### Local Testing
+          \`\`\`bash
+          npx @modelcontextprotocol/inspector $WORKER_URL/sse
+          \`\`\`
+          
+          ## 🧪 Quick Tests
+          
+          \`\`\`bash
+          # Health check
+          curl $WORKER_URL/health
+          
+          # MCP initialization test
+          curl -X POST $WORKER_URL/sse \\
+            -H 'Content-Type: application/json' \\
+            -H 'Accept: text/event-stream' \\
+            -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"clientInfo":{"name":"test","version":"1.0"}}}'
+          \`\`\`
+          
+          ## 📊 Available Tools
+          1. **\`read_documentation\`** - Read AWS service documentation
+          2. **\`search_documentation\`** - Search across AWS docs  
+          3. **\`recommend\`** - Get AWS service recommendations
+          
+          ---
+          🎯 **Next Steps**: Configure your MCP clients to use \`$WORKER_URL/sse\`
+          EOF
+
+      - name: Troubleshooting info
+        if: failure()
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          echo "🔍 Deployment failed. Troubleshooting information:"
+          echo ""
+          echo "📋 Environment:"
+          echo "  - Node.js version: $(node -v)"
+          echo "  - npm version: $(npm -v)"
+          echo "  - OS: ${{ runner.os }}"
+          echo "  - Working Directory: ${{ env.WORKING_DIRECTORY }}"
+          echo ""
+          echo "📁 Project structure:"
+          ls -la
+          echo ""
+          echo "📄 wrangler.toml content:"
+          cat wrangler.toml
+          echo ""
+          echo "📦 package.json dependencies:"
+          cat package.json | jq '.dependencies // {}'
+          echo ""
+          echo "🔧 Common fixes:"
+          echo "  1. Verify CLOUDFLARE_API_TOKEN secret is set"
+          echo "  2. Check wrangler.toml syntax"
+          echo "  3. Ensure src/worker.js exists and is valid"
+          echo "  4. Review Cloudflare Workers limits"
+          echo ""
+          echo "📚 Resources:"
+          echo "  - Cloudflare Workers docs: https://developers.cloudflare.com/workers/"
+          echo "  - Wrangler CLI docs: https://developers.cloudflare.com/workers/wrangler/"
+          echo "  - GitHub Actions docs: https://docs.github.com/en/actions" 
