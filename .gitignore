@@ -9,3 +9,35 @@ wheels/
 # Virtual environments
 .venv
 venv
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfvars
+terraform.tfvars.json
+terraform.* 
+
+# AWS
+.aws/
+
+# Build artifacts
+*.zip
+build/
+
+# Environment
+.env
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+
