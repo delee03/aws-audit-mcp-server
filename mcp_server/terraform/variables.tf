@@ -3,6 +3,7 @@ variable "name" {
   default = "aws-docs"
 }
 
+# Lambda configuration
 variable "mcp_server_lambda_memory_size" {
   type    = number
   default = 256

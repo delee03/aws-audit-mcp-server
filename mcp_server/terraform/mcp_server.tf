@@ -13,7 +13,7 @@ module "mcp_server" {
   # lambda function URL
   create_lambda_function_url = true
   authorization_type         = "NONE"
-  # invoke_mode                = "RESPONSE_STREAM"  # Important for SSE
+  #invoke_mode                = "RESPONSE_STREAM"  # Important for SSE
 
   create_package         = false
   local_existing_package = local.zip_file

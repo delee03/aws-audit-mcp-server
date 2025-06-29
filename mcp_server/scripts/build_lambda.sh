@@ -6,7 +6,7 @@ echo "🔨 Building AWS Lambda Python package..."
 
 # Configuration
 BUILD_DIR="build"
-ZIP_FILE="aws-audit-mcp-server.zip"
+ZIP_FILE="terraform/aws-audit-mcp-server.zip"
 
 # clean previous build
 rm -rf $BUILD_DIR
@@ -23,7 +23,7 @@ echo "Installing dependencies..."
 cd $BUILD_DIR
 
 # install dependencies for Lambda (x86_64)
-pip install --platform manylinux2014_x86_64 --implementation cp --python-version 3.11 --only-binary=:all: --target . pydantic mcp httpx beautifulsoup4 markdownify loguru
+pip install --platform manylinux2014_x86_64 --implementation cp --python-version 3.11 --only-binary=:all: --target . pydantic mcp httpx beautifulsoup4 markdownify loguru mangum
 
 # clean up
 echo "Cleaning up..."
