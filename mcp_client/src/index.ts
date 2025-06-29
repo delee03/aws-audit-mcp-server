@@ -8,7 +8,7 @@ const bedrock = createAmazonBedrock({
 });
 
 (async () => {
-  const url = `https://aws-docs-mcp-server.fuderr-pham.workers.dev/sse`;
+  const url = `https://mcp-server.fuderrpham.io.vn/sse`;
   const transport = new SSEClientTransport(new URL(url));
   const client = await experimental_createMCPClient({ transport });
   console.warn("Created MCP client", { url });
