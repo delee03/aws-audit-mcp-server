@@ -363,17 +363,35 @@ def main_stdio():
 
 def main_sse(port: int = 8000):
     """Run the MCP server with SSE transport."""
+    import uvicorn
     logger.info(f'Starting AWS Documentation MCP Server (SSE) on port {port}')
-    # When running in Lambda, port doesn't matter as it uses the Lambda URL
-    # For local development, we use the specified port
-    mcp.run(transport='sse')
+    
+    # Get the SSE app
+    app = mcp.sse_app()
+    
+    # Run with uvicorn for proper host binding in Docker
+    uvicorn.run(
+        app, 
+        host="0.0.0.0",  # Bind to all interfaces for Docker
+        port=port,
+        log_level="info"
+    )
 
 def main_streamable(port: int = 8000):
     """Run the MCP server with Streamable HTTP transport."""
+    import uvicorn
     logger.info(f'Starting AWS Documentation MCP Server (Streamable HTTP) on port {port}')
-    # When running in Lambda, port doesn't matter as it uses the Lambda URL
-    # For local development, we use the specified port
-    mcp.run(transport='streamable-http')
+    
+    # Get the Streamable app
+    app = mcp.app()
+    
+    # Run with uvicorn for proper host binding
+    uvicorn.run(
+        app,
+        host="0.0.0.0",  # Bind to all interfaces for Docker
+        port=port,
+        log_level="info"
+    )
 
 def main():
     """Run the MCP server with CLI argument support."""
