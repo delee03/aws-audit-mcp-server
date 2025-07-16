@@ -1,0 +1,86 @@
+name: CI/CD - Build & Deploy MCP Server
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 171895670589.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: aws-mcp-server
+  IMAGE_TAG: latest
+  PLATFORM: linux/amd64
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # OIDC for AWS login without long-lived secrets
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push multi-arch image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./mcp_server
+          file: ./mcp_server/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+  deploy-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Add EC2 host to known_hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy on EC2 - Pull & Restart
+        env:
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          ssh ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
+          set -e
+          echo "Logging in to ECR"
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+          echo "Pulling latest image"
+          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+          echo "Stopping old container"
+          docker stop aws-mcp-server || true
+          docker rm aws-mcp-server || true
+
+          echo "Starting new container"
+          docker run -d \
+            --name aws-mcp-server \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -v /home/ec2-user/mcp-logs:/app/logs \
+            -e MCP_SERVER_PORT=8000 \
+            -e FASTMCP_LOG_LEVEL=INFO \
+            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          EOF 
